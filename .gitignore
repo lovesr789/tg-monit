@@ -1,0 +1,8 @@
+*.session
+*.session-journal
+*.session-*
+__pycache__/
+.venv/
+config.yaml
+.codex/
+.aws/

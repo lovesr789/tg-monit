@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-Hant">
+<meta charset="utf-8">
+<title>拓元購票助手</title>
+<style>
+  body { width: 260px; padding: 14px; font: 14px/1.6 sans-serif; }
+  label { display: block; margin-bottom: 12px; }
+  input[type=number] { width: 64px; }
+  #status { color: #17633a; }
+</style>
+<h3>拓元購票助手 <small id="version"></small></h3>
+<form id="settings">
+  <label><input id="enabled" type="checkbox"> 自動選票並聚焦驗證碼</label>
+  <label><input id="autoCaptcha" type="checkbox"> 本機辨識並填入驗證碼</label>
+  <label><input id="autoSubmit" type="checkbox"> 辨識填入後自動按確認張數</label>
+  <label>票數 <input id="quantity" type="number" min="1" max="20" required value="1"></label>
+  <button type="submit">儲存</button>
+</form>
+<p id="status" role="status"></p>
+<p>自動選一般票、勾選同意、辨識驗證碼並按確認張數。每頁僅自動送出一次，失敗請手動處理；後續付款步驟需自行操作。辨識需開著 start.bat。</p>
+<script src="popup.js"></script>
+</html>

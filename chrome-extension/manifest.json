@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "TG 拓元購票助手",
+  "version": "1.6.0",
+  "minimum_chrome_version": "116",
+  "description": "自動選一般票、勾選同意、本機辨識填入驗證碼並按確認張數。",
+  "permissions": ["storage", "alarms"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "popup.html" },
+  "content_scripts": [{
+    "matches": ["https://tixcraft.com/ticket/*", "https://*.tixcraft.com/ticket/*", "https://tixcraft.com/activity/game/*", "https://*.tixcraft.com/activity/game/*"],
+    "js": ["timing.js", "sold-out-bridge.js"],
+    "run_at": "document_start"
+  }, {
+    "matches": ["https://tixcraft.com/ticket/*", "https://*.tixcraft.com/ticket/*", "https://tixcraft.com/activity/game/*", "https://*.tixcraft.com/activity/game/*"],
+    "js": ["sold-out-alert.js"],
+    "world": "MAIN",
+    "run_at": "document_start"
+  }, {
+    "matches": ["https://tixcraft.com/ticket/*", "https://*.tixcraft.com/ticket/*"],
+    "js": ["captcha.js", "content.js"],
+    "run_at": "document_end"
+  }]
+}

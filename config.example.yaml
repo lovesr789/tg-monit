@@ -1,0 +1,17 @@
+# 到 https://my.telegram.org -> API development tools 申請
+# 複製此檔為 config.yaml，再填入自己的憑證；config.yaml 不會提交至 Git。
+api_id: 0
+api_hash: ""
+
+# 要監聽的頻道（@username、t.me 連結都可以）
+channels:
+  - https://t.me/your_channel
+
+link_domain: tixcraft.com
+chrome_path: C:\Program Files\Google\Chrome\Application\chrome.exe
+chrome_profile: Default
+dedup_seconds: 5
+beep: false
+
+# 若修改此埠，也要更新 chrome-extension/background.js 的 URL_WS。
+bridge_port: 8765
