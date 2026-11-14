@@ -60,44 +60,7 @@ window.chrome = {
 </script>'''.replace("BACKGROUND", source).replace("TIMING", json.dumps(timing))
         self.run_browser_fixture(fixture)
 
-    def test_sold_out_alert_bridge(self):
-        hook = (BASE / "chrome-extension/sold-out-alert.js").read_text(encoding="utf-8")
-        bridge = (BASE / "chrome-extension/sold-out-bridge.js").read_text(encoding="utf-8")
-        fixture = r'''<!doctype html><meta charset="utf-8"><body>
-<script>
-let alerts = [], closeRequests = [];
-window.alert = message => alerts.push(message);
-window.chrome = { runtime: { sendMessage: async message => { closeRequests.push(message); return { closed: true }; } } };
-</script>SCRIPTS<script>
-(async () => {
-  const delay = () => new Promise(resolve => setTimeout(resolve, 100));
-  function check(value, name) { if (!value) throw Error(name); }
-  window.alert('驗證碼錯誤');
-  window.alert('請先登入');
-  await delay();
-  check(alerts.length === 2, 'preserve other native alerts');
-  check(closeRequests.length === BEFORE, 'only close sold-out alert');
-  // A sold-out row in an otherwise available event listing must not close the tab.
-  const row = document.createElement('div'); row.textContent = '此場次/區域已售完'; document.body.append(row);
-  await delay(); check(closeRequests.length === BEFORE, 'ignore ordinary page text');
-  window.alert(' 此場次 ／ 區域已售完。 ');
-  await delay(); check(closeRequests.length === 1, 'close sold-out tab once');
-  window.alert('此場次/區域已售完');
-  await delay(); check(closeRequests.length === 1, 'ignore duplicate signal');
-  check(alerts.length === 2, 'no blocking sold-out alert');
-  check(closeRequests[0].type === 'close_sold_out', 'runtime close request');
-  document.body.dataset.testResult = 'passed';
-})().catch(error => { document.body.dataset.testResult = error.message; });
-</script>'''
-        for late_bridge in (False, True):
-            with self.subTest(late_bridge=late_bridge):
-                if late_bridge:
-                    scripts = f"<script>{hook}</script><script>alert('此場次/區域已售完');</script><script>{bridge}</script>"
-                else:
-                    scripts = f"<script>{bridge}</script><script>{hook}</script>"
-                self.run_browser_fixture(fixture.replace("SCRIPTS", scripts).replace("BEFORE", "1" if late_bridge else "0"))
-
-    def test_background_closes_only_sending_sold_out_tab(self):
+    def test_background_ignores_legacy_close_requests(self):
         source = (BASE / "chrome-extension/background.js").read_text(encoding="utf-8")
         fixture = r'''<!doctype html><meta charset="utf-8"><body><script>
 let listener, removed = [];
@@ -110,28 +73,13 @@ window.chrome = {
 };
 </script><script>BACKGROUND</script><script>
 (async () => {
-  function check(value, name) { if (!value) throw Error(name); }
-  const message = { type: 'close_sold_out', message: '此場次/區域已售完', tabId: 999 };
-  const sender = { tab: { id: 42 }, frameId: 0, url: 'https://tixcraft.com/activity/game/26_btskns' };
-  let result;
-  check(listener(message, sender, value => { result = value; }) === true, 'asynchronous close response');
-  await Promise.resolve();
-  check(result.closed && removed.length === 1 && removed[0] === 42, 'use sending tab id only');
-  for (const invalidSender of [
-    { ...sender, frameId: 1 }, { ...sender, url: 'https://example.com/ticket/test' },
-    { ...sender, url: 'https://tixcraft.com.evil.example/ticket/test' },
-    { ...sender, url: 'https://tixcraft.com/ticketing/checkout' },
-    { ...sender, url: 'https://tixcraft.com/activity/detail/test' }, { ...sender, tab: undefined }
-  ]) {
-    let denied; listener(message, invalidSender, value => { denied = value; });
-    check(denied.error, 'reject unrelated sender');
+  const message = { type: 'close_sold_out', message: '\u6b64\u5834\u6b21/\u5340\u57df\u5df2\u552e\u5b8c', tabId: 999 };
+  for (const url of ['https://tixcraft.com/activity/game/test', 'https://tixcraft.com/ticket/ticket/test']) {
+    const result = listener(message, { tab: { id: 42 }, frameId: 0, url }, () => {});
+    if (result === true) throw Error('legacy close request still handled');
   }
-  let denied; listener({ ...message, message: '驗證碼錯誤' }, sender, value => { denied = value; });
-  check(denied.error && removed.length === 1, 'reject unrelated alerts');
-  chrome.tabs.remove = async () => { throw new Error('tab unavailable'); };
-  listener(message, sender, value => { result = value; });
-  await Promise.resolve(); await Promise.resolve();
-  check(result.error === 'tab unavailable', 'surface close failure');
+  await Promise.resolve();
+  if (removed.length) throw Error('sold-out tab was closed');
   document.body.dataset.testResult = 'passed';
 })().catch(error => { document.body.dataset.testResult = error.message; });
 </script>'''.replace("BACKGROUND", source)

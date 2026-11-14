@@ -9,7 +9,7 @@ let keepalive = null;
 let retry = null;
 const ocrRequests = new Map();
 const attempts = new Map();
-const progressStages = new Set(["page_start", "tickets_ready", "ocr_start", "captcha_filled", "manual_input", "ocr_failed", "submit_click", "sold_out"]);
+const progressStages = new Set(["page_start", "tickets_ready", "ocr_start", "captcha_filled", "manual_input", "ocr_failed", "submit_click"]);
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === "progress") {
@@ -26,18 +26,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     sendResponse({ ok: true });
     return;
-  }
-  if (message?.type === "close_sold_out") {
-    const eligibleUrl = /^https:\/\/([a-z0-9-]+\.)*tixcraft\.com\/(ticket\/|activity\/game\/)/;
-    if (!Number.isInteger(sender.tab?.id) || sender.frameId !== 0 || !eligibleUrl.test(sender.url || "") ||
-        !/^此(?:場次[\/／]區域|場次|區域)已售完$/.test(message.message || "")) {
-      sendResponse({ error: "不支援此頁面或售完提示" });
-      return;
-    }
-    // Use the sending tab's id exclusively, never a caller-supplied id.
-    chrome.tabs.remove(sender.tab.id).then(() => sendResponse({ closed: true }))
-      .catch(error => sendResponse({ error: error.message }));
-    return true;
   }
   if (message.type !== "ocr") return;
   if (!sender.tab || !ALLOWED.test(sender.url || "")) {

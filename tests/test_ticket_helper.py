@@ -126,12 +126,13 @@ function check(condition, label) { if (!condition) throw Error(label); results.p
             for filename in script["js"]:
                 self.assertTrue((extension / filename).is_file())
         self.assertTrue((extension / manifest["action"]["default_popup"]).is_file())
-        alert_hook = next(item for item in manifest["content_scripts"] if "sold-out-alert.js" in item["js"])
-        bridge = next(item for item in manifest["content_scripts"] if "sold-out-bridge.js" in item["js"])
-        self.assertEqual(alert_hook["world"], "MAIN")
-        self.assertEqual(alert_hook["run_at"], "document_start")
-        self.assertEqual(bridge["run_at"], "document_start")
-        self.assertIn("https://tixcraft.com/activity/game/*", alert_hook["matches"])
+        scripts = [filename for item in manifest["content_scripts"] for filename in item["js"]]
+        self.assertNotIn("sold-out-alert.js", scripts)
+        self.assertNotIn("sold-out-bridge.js", scripts)
+        timing = next(item for item in manifest["content_scripts"] if "timing.js" in item["js"])
+        self.assertEqual(timing["run_at"], "document_start")
+        self.assertIn("https://tixcraft.com/activity/game/*", timing["matches"])
+
 
 
 if __name__ == "__main__":

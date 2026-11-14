@@ -39,6 +39,12 @@ _bridges: set = set()  # 已連上的擴充功能背景程式
 _server = None
 
 
+def log(*parts: object, timestamp: float | None = None) -> None:
+    """Print a console entry with local time to the nearest second."""
+    moment = datetime.now() if timestamp is None else datetime.fromtimestamp(timestamp)
+    print(f"[{moment:%H:%M:%S}]", *parts, flush=True)
+
+
 def extract_links(msg) -> list[str]:
     """從文字、超連結 entity、inline 按鈕裡找出目標網域的連結（保持順序、去重）。"""
     text = msg.raw_text or ""
@@ -92,7 +98,7 @@ async def bridge_handler(ws):
         await ws.close(1008, "forbidden")
         return
     _bridges.add(ws)
-    print(f"🔌 擴充功能已連線（{len(_bridges)}）→ 開分頁走擴充功能", flush=True)
+    log(f"🔌 擴充功能已連線（{len(_bridges)}）→ 開分頁走擴充功能")
     try:
         async for payload in ws:
             if payload == "keepalive":
@@ -108,7 +114,7 @@ async def bridge_handler(ws):
                     "page_start": "頁面開始", "tickets_ready": "票數已選",
                     "ocr_start": "開始辨識", "captcha_filled": "驗證碼已填",
                     "manual_input": "保留手動輸入", "ocr_failed": "辨識失敗／分歧",
-                    "submit_click": "已按確認張數", "sold_out": "售完關閉",
+                    "submit_click": "已按確認張數",
                 }
                 stage = stages.get(request.get("stage"))
                 page_ms = request.get("page_ms")
@@ -118,7 +124,7 @@ async def bridge_handler(ws):
                         value = request.get(key)
                         if isinstance(value, (int, float)) and 0 <= value < 86_400_000:
                             details += f" | {label} {value:.0f}ms"
-                    print(f"[流程] {stage} | {details} | {str(request.get('url', ''))[:300]}", flush=True)
+                    log(f"[流程] {stage} | {details} | {str(request.get('url', ''))[:300]}")
                 continue
             if request.get("type") != "ocr":
                 continue
@@ -136,7 +142,7 @@ async def bridge_handler(ws):
     finally:
         _bridges.discard(ws)
         if not _bridges:
-            print("⚠ 擴充功能斷線 → 暫時改用 Popen 開分頁（會自動重連）", flush=True)
+            log("⚠ 擴充功能斷線 → 暫時改用 Popen 開分頁（會自動重連）")
 
 
 def beep() -> None:
@@ -179,11 +185,10 @@ async def on_message(event):
     first_line = next(
         (l for l in (event.raw_text or "").splitlines() if "剩餘" in l), ""
     ).strip()
-    stamp = datetime.fromtimestamp(t_recv).strftime("%H:%M:%S.%f")[:-3]
     for url, path, local_ms in opened:
-        print(
-            f"[{stamp}] {chat} | {first_line} | TG≤{tg_ms:.0f}ms | 本機{local_ms:.1f}ms({path}) | 開啟 {url}",
-            flush=True,
+        log(
+            f"{chat} | {first_line} | TG≤{tg_ms:.0f}ms | 本機{local_ms:.1f}ms({path}) | 開啟 {url}",
+            timestamp=t_recv,
         )
 
 
@@ -191,17 +196,17 @@ async def main():
     async def warmup_ocr():
         try:
             await asyncio.to_thread(ocr.warmup)
-            print("驗證碼雙模型辨識已就緒（原圖＋藍底白字處理；至少三次一致，且兩模型處理後結果相同才填入）", flush=True)
+            log("驗證碼雙模型辨識已就緒（原圖＋藍底白字處理；至少三次一致，且兩模型處理後結果相同才填入）")
         except Exception as error:
-            print(f"⚠ 驗證碼辨識無法啟動，仍可手動輸入：{error}", flush=True)
+            log(f"⚠ 驗證碼辨識無法啟動，仍可手動輸入：{error}")
 
     ocr_task = asyncio.create_task(warmup_ocr())
     try:
         global _server
         _server = await serve(bridge_handler, "127.0.0.1", BRIDGE_PORT, max_size=1_500_000)
-        print(f"擴充功能橋接：ws://127.0.0.1:{BRIDGE_PORT}（等待連線，連上前用 Popen）", flush=True)
+        log(f"擴充功能橋接：ws://127.0.0.1:{BRIDGE_PORT}（等待連線，連上前用 Popen）")
     except OSError as e:
-        print(f"⚠ 橋接埠 {BRIDGE_PORT} 無法使用（{e}），全程改用 Popen 開分頁", flush=True)
+        log(f"⚠ 橋接埠 {BRIDGE_PORT} 無法使用（{e}），全程改用 Popen 開分頁")
 
     await client.start()
     names = []
@@ -210,10 +215,10 @@ async def main():
             ent = await client.get_entity(c)
             names.append(getattr(ent, "title", c))
         except Exception as e:
-            print(f"⚠ 找不到頻道 {c}: {e}")
-    print("監聽中：", "、".join(names), flush=True)
-    print(f"Popen 退路：{CHROME} --profile-directory={PROFILE}", flush=True)
-    print("購票頁需先載入 chrome-extension 擴充功能；可設定辨識填入後自動確認張數。", flush=True)
+            log(f"⚠ 找不到頻道 {c}: {e}")
+    log("監聽中：", "、".join(names))
+    log(f"Popen 退路：{CHROME} --profile-directory={PROFILE}")
+    log("購票頁需先載入 chrome-extension 擴充功能；可設定辨識填入後自動確認張數。")
     await client.run_until_disconnected()
     await ocr_task
 
